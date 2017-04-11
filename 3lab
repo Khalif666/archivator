@@ -11,12 +11,29 @@ void main()
   pid_t pid, child_pid;
 
   int rv;
+  char *words[100];
   char proc[100];
+  har sep[] = " ";
 while(1) {
   printf("Please, enter the name of the process:\n");
   scanf("%s",proc);
-  if (strcmp(proc,"break")==0)
-      exit(0);
+  int mode = 1;
+  int i = 0; 
+  char *ptr = strtok(proc, sep);
+   while (ptr != NULL)
+     {
+       words[i++] = ptr;
+       ptr = strtok (NULL, sep);
+     }
+     
+    if (i > 1 && strcmp(words[i-1], "$") == 0) {
+	mode = 0;
+	words[i-1] = NULL;
+	} 
+     else words[i] = NULL;
+		
+ if (strcmp(words[0], "exit") == 0)
+     exit(0);
   switch(pid=fork()) {
   case -1:
           perror("fork"); /* произошла ошибка */
@@ -26,13 +43,13 @@ while(1) {
           printf(" CHILD: My PID is-- %d\n", getpid());
           printf(" CHILD: My parent PID -- %d\n", getppid());
           printf(" CHILD: My process was changed\n");
-          execlp(proc,proc,NULL);
+          execlp(words[0],words,NULL);
   default:
           printf("PARENT: This is parent process!\n");
           printf("PARENT: My PID -- %d\n", getpid());
           printf("PARENT: My child PID %d\n",pid);
           printf("PARENT: I'm waiting for the completion of the child process.\n");
-          if (pid != 0) {
+          if (pid != 0 && mode) {
           child_pid=wait(&rv);
 	  printf("Child has finished: PID = %d\n",child_pid);
           if (WIFEXITED(rv))
