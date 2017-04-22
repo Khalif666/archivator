@@ -1,0 +1,15 @@
+#include <stdio.h>
+
+static __inline__ unsigned long long rdtsc(void)
+{
+unsigned int lo, hi;
+
+__asm__ __volatile__("rdtsc":"=a"(lo),"=d"(hi));
+
+return ((unsigned long long)lo)|(((unsigned long long)hi)<<32);
+}
+
+void main()
+{
+printf("%llu\n",rdtsc());
+}
