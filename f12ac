@@ -1,0 +1,210 @@
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <dirent.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <malloc.h>
+#include <errno.h>
+
+#define a1 256
+#define a2 256
+#define a3 1024
+#define size 1024
+
+struct afile {
+char name[a1];
+char info[a1];
+char dirinfo[a1];
+int s_mas;
+};
+
+int i;
+int k;
+struct afile ar[a3];
+char path[a3];
+char path1[a3];
+char bufprint[size];
+
+void archive(char *dir)
+{
+DIR *dp; //Ukazatel na direktoriu
+struct dirent *rf; //sruktura soderzhit index i imya faila
+struct stat statbuf;//informacia o faile
+dp = opendir(dir);
+if (dp == NULL) {
+fprintf(stderr, "can't open directory: %s\n", dir);
+return;
+}
+chdir(dir);
+if (i == 0)
+strncat(path, dir, sizeof(dir));
+while ((rf = readdir(dp)) != NULL) {
+lstat(rf->d_name, &statbuf);
+if (S_ISDIR(statbuf.st_mode)) {
+if (strcmp(".", rf->d_name) == 0 || strcmp("..", rf->d_name) == 0)
+continue; //Ignorirovanie tekutschey u rodit dir
+i++;
+strncat(path, "/", 1);
+strncat(path, rf->d_name, sizeof(rf->d_name));
+archive(rf->d_name);
+strncat(path1, path, strlen(path)-strlen(rf->d_name)-1);
+path[0] = '\0';
+strcpy(path, path1);
+path1[0] = '\0';
+i--;
+} else {
+int nread;
+int in;
+
+strcpy(ar[k].name, rf->d_name);
+strcpy(ar[k].dirinfo, path);
+in = open(rf->d_name, O_RDONLY);
+if (in == -1) {
+printf("%s\n", strerror(errno));
+return;
+} while ((nread = read(in, ar[k].info, sizeof(ar[k].info))) > 0);
+k++;
+ar[0].s_mas = k;
+}
+}
+chdir("..");
+closedir(dp);
+}
+
+void unpack(char *file) //Raspakovka
+{
+struct afile *buf;
+struct afile *bvf, *bvf1;
+DIR *dp, *ip;
+int nread, ac, er;
+int f_a = open(file, O_RDONLY, S_IRUSR|S_IWUSR);
+
+if (f_a == -1) {
+printf("Can't open archive\n");
+printf("%s\n", strerror(errno));
+return;
+}
+buf = (struct afile *) malloc(sizeof(struct afile));
+int r_file = read(f_a, buf, sizeof(struct afile));
+
+if (r_file < 0) {
+printf("Can't read archive\n");
+printf("%s\n", strerror(errno));
+exit(0);
+}
+close(f_a);
+f_a = open(file, O_RDONLY, S_IRUSR|S_IWUSR);
+if (f_a == -1) {
+printf("Can't open archive again\n");
+printf("%s\n", strerror(errno));
+exit(0);
+}
+bvf = (struct afile *) malloc(buf[0].s_mas*sizeof(struct afile));
+bvf1 = (struct afile *) malloc(buf[0].s_mas*sizeof(struct afile));
+r_file = read(f_a, bvf, (buf[0].s_mas)*sizeof(struct afile));
+if (r_file < 0) {
+printf("Can't read archive again\n");
+printf("%s\n", strerror(errno));
+exit(0); }
+dp = opendir("./unpack");
+if (dp != NULL) {
+er = rmdir("./unpack");
+if (er != 0)
+printf("Unable to clear a folder to unpack: %s\n", strerror(errno));
+}
+er = mkdir("./unpack", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+if (er == 0)
+printf("Unpack...\n");
+else
+printf("Can't make directory:\n%s\n", strerror(errno));
+chdir("./unpack");
+ac = 0;
+char din[a1] = {'\0'};
+
+while (ac < buf[0].s_mas) {
+strcpy(bvf1[ac].dirinfo, bvf[ac].dirinfo);
+dp = opendir(bvf1[ac].dirinfo);
+if (dp == NULL) {
+char *c;
+
+c = strtok(bvf[ac].dirinfo, "/");
+while (c != NULL) {
+strcat(din, c);
+c = strtok(NULL, "/");
+if (din == "./")
+continue;
+ip = opendir(din);
+if (ip  == NULL) {
+er = mkdir(din, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+if (er != 0) {
+printf("This dir doesnt make! %s, because:\t", din);
+printf("%s\n", strerror(errno));
+}
+}
+if (c != NULL)
+strncat(din, "/", sizeof("/"));
+}
+}
+din[0] = '\0';
+++ac;
+}
+for (ac = 0; ac < buf[0].s_mas; ac++) {
+int dchr = chdir(bvf1[ac].dirinfo);
+char dir[a1];
+
+getcwd(dir, a1);
+int sp = sprintf(bufprint, "%s\n", dir);
+
+printf("Currently dir is %s", bufprint);
+FILE *out = fopen(bvf[ac].name, "w+b");
+
+if (out == NULL) {
+printf("Can't open file: %s\n", bvf[ac].name);
+printf("%s\n", strerror(errno));
+}
+int w_f = fwrite(bvf[ac].info, sizeof(char), sizeof(bvf[ac].info), out);
+if (w_f != sizeof(bvf[ac].info)) {
+printf("Can't write in file: %s\n", bvf[ac].name);
+printf("%s\n", strerror(errno));
+}
+fclose(out);
+dchr = chdir("/home/khalif/Desktop/unpack");
+if (dchr != 0)
+printf("%s\n", strerror(errno));
+}
+free(buf);
+free(bvf);
+free(bvf1);
+}
+
+int main(void)
+{
+int chs;
+char dir[a2];
+printf("To back up a file or folder press 1\n");
+printf("If you need unpack file press 2\n");
+scanf("%i", &chs);
+
+if (chs == 1) {
+printf("Enter folder or file name:\t");
+scanf("%s", dir);
+printf("\n");
+int arc = open("Archiv", O_WRONLY|O_CREAT|O_RDONLY, S_IRUSR|S_IWUSR);
+archive(dir);
+int w_file = write(arc, ar, k *sizeof(struct afile));
+if (w_file < 0) {
+fprintf(stderr, "Can't write %s\n", dir);
+exit(0);
+}
+close(arc);
+}
+if (chs == 2) {
+printf("Enter the file name:\n");
+scanf("%s", dir);
+unpack(dir);
+}
+
+exit(0);
+}
